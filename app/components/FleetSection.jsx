@@ -110,13 +110,13 @@ function CarCard({ car, onChangeEstado, onChangeFecha, archivoBlackClass }) {
         </button>
       )}
 
-      <div className="flex gap-2.5 mt-4">
+      <div className="flex flex-col gap-2.5 mt-4">
         {otherEstados.map((e) => (
           <button
             key={e.value}
             type="button"
             onClick={() => onChangeEstado(car.id, e.value)}
-            className="flex-1 text-center text-[13px] font-extrabold tracking-wide uppercase px-2.5 py-3.5 rounded-md cursor-pointer"
+            className="w-full text-center text-[13px] font-extrabold tracking-wide uppercase px-2.5 py-3.5 rounded-md cursor-pointer"
             style={{ background: e.color, color: e.textOnColor }}
           >
             Marcar {e.label}
@@ -205,26 +205,26 @@ export default function FleetSection({ archivoBlackClass }) {
   }));
 
   return (
-    <div className="px-10 pt-7">
+    <div className="px-5 sm:px-10 pt-5 sm:pt-7">
       {error ? (
         <div className="mb-4 text-[13px] font-semibold text-white bg-[#B8422F] px-4 py-2.5 rounded">{error}</div>
       ) : null}
 
-      <div className="flex gap-5 flex-wrap">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
         {stats.map((s) => (
-          <div key={s.label} className="bg-white rounded-[10px] px-6.5 py-5.5 min-w-[200px] flex-1">
-            <div className="flex items-center gap-2 mb-3.5">
-              <div className="w-[9px] h-[9px] rounded-full" style={{ background: s.dotColor }} />
-              <div className="text-[11px] font-bold tracking-widest text-[#6B6B68] uppercase">{s.label}</div>
+          <div key={s.label} className="bg-white rounded-[10px] px-4 py-4 sm:px-6.5 sm:py-5.5">
+            <div className="flex items-center gap-2 mb-2 sm:mb-3.5">
+              <div className="w-[9px] h-[9px] rounded-full shrink-0" style={{ background: s.dotColor }} />
+              <div className="text-[10px] sm:text-[11px] font-bold tracking-widest text-[#6B6B68] uppercase">{s.label}</div>
             </div>
-            <div className={`${archivoBlackClass} text-[38px] text-[#1B1917]`}>{s.value}</div>
+            <div className={`${archivoBlackClass} text-[26px] sm:text-[38px] text-[#1B1917]`}>{s.value}</div>
           </div>
         ))}
       </div>
 
-      <div className="flex gap-6 mt-6 items-start flex-wrap">
+      <div className="flex gap-4 sm:gap-6 mt-5 sm:mt-6 items-start flex-wrap">
         {columns.map((col) => (
-          <div key={col.value} className="bg-[#E7E2D3] rounded-xl p-4 flex-1 min-w-[320px]">
+          <div key={col.value} className="bg-[#E7E2D3] rounded-xl p-4 flex-1 min-w-[280px] sm:min-w-[320px]">
             <div
               className="inline-flex items-center gap-2.5 text-white text-[13px] font-bold tracking-wide uppercase mb-4 py-2.5 pl-4 pr-5"
               style={{ background: col.color, clipPath: "polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%)" }}

@@ -87,7 +87,7 @@ function KanbanColumn({ column, clients, archivoBlackClass, isOver }) {
   return (
     <div
       ref={setNodeRef}
-      className="bg-[#E7E2D3] rounded-xl p-4 min-w-[280px] shrink-0"
+      className="bg-[#E7E2D3] rounded-xl p-4 min-w-[82vw] sm:min-w-[280px] shrink-0"
       style={{ border: `2px dashed ${isOver ? "#E0A526" : "transparent"}`, transition: "border-color 0.15s ease" }}
     >
       <div
@@ -189,7 +189,7 @@ export default function ConversationsBoard({ archivoBlackClass }) {
   const activeColumn = activeClient ? COLUMNS.find((c) => c.value === activeClient.estado) : null;
 
   return (
-    <div className="px-10 pt-7">
+    <div className="px-5 sm:px-10 pt-5 sm:pt-7">
       {error ? (
         <div className="mb-4 text-[13px] font-semibold text-white bg-[#B8422F] px-4 py-2.5 rounded">{error}</div>
       ) : null}
