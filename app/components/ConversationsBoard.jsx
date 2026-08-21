@@ -58,23 +58,23 @@ function ClientCard({ client, columnColor, archivoBlackClass, isOverlay }) {
       {...listeners}
       {...attributes}
       style={style}
-      className="bg-white rounded-lg pt-4 pb-4 pl-3.5 pr-4 transition-shadow hover:shadow-md"
+      className="bg-white rounded-lg py-3 pl-3 pr-3.5 transition-shadow hover:shadow-md"
     >
       <div className="flex justify-between items-start gap-2">
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
           <GripDots />
-          <div className={`${archivoBlackClass} text-[16px] text-[#1B1917] truncate`}>{client.nombre}</div>
+          <div className={`${archivoBlackClass} text-[13px] text-[#1B1917] truncate`}>{client.nombre}</div>
         </div>
         {client.telefono ? (
-          <div className="bg-[#F0EDE3] text-[#6B6B68] text-[11px] font-semibold px-2 py-1 rounded whitespace-nowrap">
+          <div className="bg-[#F0EDE3] text-[#6B6B68] text-[10px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap shrink-0">
             {client.telefono}
           </div>
         ) : null}
       </div>
       {client.conversacion ? (
-        <div className="mt-2.5 text-[13px] text-[#6B6B68] leading-relaxed line-clamp-3">{client.conversacion}</div>
+        <div className="mt-1.5 text-[12px] text-[#6B6B68] leading-snug line-clamp-2">{client.conversacion}</div>
       ) : null}
-      <div className="mt-3 text-[12px] text-[#1B1917] flex items-center gap-1.5">
+      <div className="mt-2 text-[11px] text-[#1B1917] flex items-center gap-1.5">
         <span style={{ color: columnColor }}>●</span> Último contacto: {formatLastContact(client.fechaContacto)}
       </div>
     </div>
@@ -87,7 +87,7 @@ function KanbanColumn({ column, clients, archivoBlackClass, isOver }) {
   return (
     <div
       ref={setNodeRef}
-      className="bg-[#E7E2D3] rounded-xl p-4 min-w-[82vw] sm:min-w-[280px] shrink-0"
+      className="bg-[#E7E2D3] rounded-xl p-4 w-[82vw] sm:w-[280px] shrink-0"
       style={{ border: `2px dashed ${isOver ? "#E0A526" : "transparent"}`, transition: "border-color 0.15s ease" }}
     >
       <div
@@ -97,7 +97,7 @@ function KanbanColumn({ column, clients, archivoBlackClass, isOver }) {
         <span>{column.label}</span>
         <span className="text-[14px]">{clients.length}</span>
       </div>
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2.5">
         {clients.map((client) => (
           <ClientCard key={client.id} client={client} columnColor={column.color} archivoBlackClass={archivoBlackClass} />
         ))}
