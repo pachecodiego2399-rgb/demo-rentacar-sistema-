@@ -22,10 +22,55 @@ const COLUMNS = [
   { value: "Completado", label: "Completado", color: "#1B1917" },
 ];
 
+const COLUMN_BY_VALUE = Object.fromEntries(COLUMNS.map((c) => [c.value, c]));
+
 function formatLastContact(iso) {
   if (!iso) return "—";
   const d = new Date(`${iso}T00:00:00`);
   return new Intl.DateTimeFormat("es-CL", { day: "2-digit", month: "short" }).format(d);
+}
+
+// El campo Conversación en Airtable viene como bloques de texto:
+//   [dd/MM/yyyy HH:mm]
+//   Cliente: mensaje
+//   Salva: respuesta
+// repetidos por cada intercambio. Si el texto trae código de n8n sin
+// resolver (p. ej. "{{ ... }}"), se marca como "malformed" para mostrarlo
+// como texto plano en vez de intentar armar burbujas con eso.
+function parseConversation(raw) {
+  if (!raw) return { messages: [], malformed: false };
+
+  const looksLikeUnresolvedCode = /\{\{|\$\(['"]|\.item\.json|toFormat\(/.test(raw);
+  if (looksLikeUnresolvedCode) return { messages: [], malformed: true };
+
+  const lines = raw.split(/\r?\n/);
+  const messages = [];
+  let currentTimestamp = null;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    const tsMatch = line.match(/^\[([^\]]+)\]$/);
+    if (tsMatch) {
+      currentTimestamp = tsMatch[1];
+      continue;
+    }
+
+    const clienteMatch = line.match(/^Cliente:\s*(.*)$/i);
+    const salvaMatch = line.match(/^Salva:\s*(.*)$/i);
+
+    if (clienteMatch) {
+      messages.push({ sender: "cliente", text: clienteMatch[1], timestamp: currentTimestamp });
+    } else if (salvaMatch) {
+      messages.push({ sender: "salva", text: salvaMatch[1], timestamp: currentTimestamp });
+    } else if (messages.length > 0) {
+      messages[messages.length - 1].text += ` ${line}`;
+    }
+  }
+
+  if (messages.length === 0) return { messages: [], malformed: true };
+  return { messages, malformed: false };
 }
 
 function GripDots() {
@@ -38,7 +83,19 @@ function GripDots() {
   );
 }
 
-function ClientCard({ client, columnColor, archivoBlackClass, isOverlay }) {
+function StatusBadge({ column }) {
+  if (!column) return null;
+  return (
+    <span
+      className="text-[11px] font-bold tracking-wide uppercase px-3 py-1 rounded-full whitespace-nowrap"
+      style={{ background: column.color, color: "#FFFFFF" }}
+    >
+      {column.label}
+    </span>
+  );
+}
+
+function ClientCard({ client, columnColor, archivoBlackClass, isOverlay, onOpen }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: client.id,
     data: { fromColumn: client.estado },
@@ -57,6 +114,7 @@ function ClientCard({ client, columnColor, archivoBlackClass, isOverlay }) {
       ref={setNodeRef}
       {...listeners}
       {...attributes}
+      onClick={() => onOpen && onOpen(client)}
       style={style}
       className="bg-white rounded-lg py-3 pl-3 pr-3.5 transition-shadow hover:shadow-md"
     >
@@ -81,13 +139,13 @@ function ClientCard({ client, columnColor, archivoBlackClass, isOverlay }) {
   );
 }
 
-function KanbanColumn({ column, clients, archivoBlackClass, isOver }) {
+function KanbanColumn({ column, clients, archivoBlackClass, isOver, onOpenDetail }) {
   const { setNodeRef } = useDroppable({ id: column.value });
 
   return (
     <div
       ref={setNodeRef}
-      className="bg-[#E7E2D3] rounded-xl p-4 w-[82vw] sm:w-[280px] shrink-0"
+      className="bg-[#E7E2D3] rounded-xl p-4 w-full sm:w-[280px] shrink-0"
       style={{ border: `2px dashed ${isOver ? "#E0A526" : "transparent"}`, transition: "border-color 0.15s ease" }}
     >
       <div
@@ -99,8 +157,101 @@ function KanbanColumn({ column, clients, archivoBlackClass, isOver }) {
       </div>
       <div className="flex flex-col gap-2.5">
         {clients.map((client) => (
-          <ClientCard key={client.id} client={client} columnColor={column.color} archivoBlackClass={archivoBlackClass} />
+          <ClientCard
+            key={client.id}
+            client={client}
+            columnColor={column.color}
+            archivoBlackClass={archivoBlackClass}
+            onOpen={onOpenDetail}
+          />
         ))}
+        {clients.length === 0 ? (
+          <div className="text-[13px] text-[#6B6B68] italic px-1 py-2">Sin clientes en este estado</div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function ChatBubble({ message }) {
+  const isCliente = message.sender === "cliente";
+  return (
+    <div className={`flex ${isCliente ? "justify-start" : "justify-end"}`}>
+      <div
+        className="max-w-[80%] sm:max-w-[65%] px-4 py-2.5 text-[14px] leading-relaxed"
+        style={
+          isCliente
+            ? {
+                background: "#FFFFFF",
+                color: "#1B1917",
+                border: "1px solid #E5DFCB",
+                borderRadius: "12px 12px 12px 2px",
+              }
+            : {
+                background: "#1B1917",
+                color: "#FFFFFF",
+                borderRadius: "12px 12px 2px 12px",
+              }
+        }
+      >
+        <div className="text-[10px] font-bold uppercase tracking-wide mb-1 opacity-60">
+          {isCliente ? "Cliente" : "Salva"}
+        </div>
+        {message.text}
+      </div>
+    </div>
+  );
+}
+
+function ConversationDetail({ client, column, archivoBlackClass, onClose }) {
+  const { messages, malformed } = parseConversation(client.conversacion);
+
+  let lastTimestamp = null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col" style={{ background: "#F3EEE1" }}>
+      <div className="flex items-start justify-between gap-3 px-5 sm:px-10 py-5 border-b border-[#E5DFCB]">
+        <div className="min-w-0">
+          <div className={`${archivoBlackClass} text-[19px] sm:text-[22px] text-[#1B1917] truncate`}>
+            {client.nombre || "Cliente sin nombre"}
+          </div>
+          <div className="text-[13px] text-[#6B6B68] mt-1">{client.telefono || "Sin teléfono"}</div>
+          <div className="mt-2.5">
+            <StatusBadge column={column} />
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="cursor-pointer shrink-0 bg-[#1B1917] text-white text-[13px] font-bold uppercase tracking-wide px-4 py-2.5 rounded"
+        >
+          Cerrar
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-5 sm:px-10 py-6">
+        {malformed ? (
+          <div className="max-w-[720px] mx-auto bg-white border border-[#E5DFCB] rounded-lg p-4 text-[13px] text-[#6B6B68] whitespace-pre-wrap break-words">
+            {client.conversacion ? client.conversacion : "Todavía no hay conversación registrada para este cliente."}
+          </div>
+        ) : (
+          <div className="max-w-[720px] mx-auto flex flex-col gap-3">
+            {messages.map((message, i) => {
+              const showTimestamp = message.timestamp && message.timestamp !== lastTimestamp;
+              if (showTimestamp) lastTimestamp = message.timestamp;
+              return (
+                <div key={i} className="flex flex-col gap-3">
+                  {showTimestamp ? (
+                    <div className="text-center text-[11px] font-semibold text-[#6B6B68] uppercase tracking-wide">
+                      {message.timestamp}
+                    </div>
+                  ) : null}
+                  <ChatBubble message={message} />
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -111,6 +262,7 @@ export default function ConversationsBoard({ archivoBlackClass }) {
   const [error, setError] = useState(null);
   const [activeId, setActiveId] = useState(null);
   const [overId, setOverId] = useState(null);
+  const [detailClientId, setDetailClientId] = useState(null);
   const suppressPollRef = useRef(false);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -186,7 +338,8 @@ export default function ConversationsBoard({ archivoBlackClass }) {
   }
 
   const activeClient = activeId ? clientes.find((c) => c.id === activeId) : null;
-  const activeColumn = activeClient ? COLUMNS.find((c) => c.value === activeClient.estado) : null;
+  const activeColumn = activeClient ? COLUMN_BY_VALUE[activeClient.estado] : null;
+  const detailClient = detailClientId ? clientes.find((c) => c.id === detailClientId) : null;
 
   return (
     <div className="px-5 sm:px-10 pt-5 sm:pt-7">
@@ -201,7 +354,7 @@ export default function ConversationsBoard({ archivoBlackClass }) {
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-5 items-start overflow-x-auto pb-2">
+        <div className="flex flex-col sm:flex-row gap-5 items-stretch sm:items-start sm:overflow-x-auto sm:pb-2">
           {COLUMNS.map((column) => (
             <KanbanColumn
               key={column.value}
@@ -209,6 +362,7 @@ export default function ConversationsBoard({ archivoBlackClass }) {
               clients={clientes.filter((c) => c.estado === column.value)}
               archivoBlackClass={archivoBlackClass}
               isOver={overId === column.value}
+              onOpenDetail={(client) => setDetailClientId(client.id)}
             />
           ))}
         </div>
@@ -220,6 +374,15 @@ export default function ConversationsBoard({ archivoBlackClass }) {
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      {detailClient ? (
+        <ConversationDetail
+          client={detailClient}
+          column={COLUMN_BY_VALUE[detailClient.estado]}
+          archivoBlackClass={archivoBlackClass}
+          onClose={() => setDetailClientId(null)}
+        />
+      ) : null}
     </div>
   );
 }
