@@ -81,10 +81,6 @@ function CarCard({ car, onChangeEstado, onChangeFecha, archivoBlackClass }) {
         <span className="text-[14px] text-[#6B6B68]">/ día</span>
       </div>
 
-      {car.requisitos ? (
-        <div className="mt-2.5 text-[14px] text-[#6B6B68] leading-relaxed">{car.requisitos}</div>
-      ) : null}
-
       {car.fechaDevolucion && !editingDate ? (
         <div className="mt-3 text-[14px] text-[#1B1917] flex items-center gap-1.5">
           <span style={{ color: "#E0A526" }}>●</span> Devolución: <strong>{formatDate(car.fechaDevolucion)}</strong>

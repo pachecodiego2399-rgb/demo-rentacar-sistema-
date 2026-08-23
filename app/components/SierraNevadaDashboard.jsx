@@ -59,12 +59,12 @@ export default function SierraNevadaDashboard() {
         </div>
       </div>
 
-      <div className="w-full h-8 relative">
-        <svg width="100%" height="32" viewBox="0 0 1200 32" preserveAspectRatio="none" className="block">
+      <div className="w-full h-4 relative">
+        <svg width="100%" height="14" viewBox="0 0 1200 32" preserveAspectRatio="none" className="block">
           <rect width="1200" height="32" fill="#1B1917" />
           <polygon points={ZIGZAG_POINTS} fill="#E0A526" />
         </svg>
-        <div className="h-[3px] bg-[#E0A526]" />
+        <div className="h-[2px] bg-[#E0A526]" />
       </div>
 
       <div className="flex gap-2 px-5 sm:px-10 pt-4 sm:pt-5">
