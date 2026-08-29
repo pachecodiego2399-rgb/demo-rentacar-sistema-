@@ -58,10 +58,13 @@ function parseConversation(raw) {
     }
 
     const clienteMatch = line.match(/^Cliente:\s*(.*)$/i);
+    const salvaManualMatch = line.match(/^Salva\s*\(manual\):\s*(.*)$/i);
     const salvaMatch = line.match(/^Salva:\s*(.*)$/i);
 
     if (clienteMatch) {
       messages.push({ sender: "cliente", text: clienteMatch[1], timestamp: currentTimestamp });
+    } else if (salvaManualMatch) {
+      messages.push({ sender: "salva-manual", text: salvaManualMatch[1], timestamp: currentTimestamp });
     } else if (salvaMatch) {
       messages.push({ sender: "salva", text: salvaMatch[1], timestamp: currentTimestamp });
     } else if (messages.length > 0) {
@@ -175,6 +178,7 @@ function KanbanColumn({ column, clients, archivoBlackClass, isOver, onOpenDetail
 
 function ChatBubble({ message }) {
   const isCliente = message.sender === "cliente";
+  const isManual = message.sender === "salva-manual";
   return (
     <div className={`flex ${isCliente ? "justify-start" : "justify-end"}`}>
       <div
@@ -187,6 +191,12 @@ function ChatBubble({ message }) {
                 border: "1px solid #E5DFCB",
                 borderRadius: "12px 12px 12px 2px",
               }
+            : isManual
+            ? {
+                background: "#B8791A",
+                color: "#FFFFFF",
+                borderRadius: "12px 12px 2px 12px",
+              }
             : {
                 background: "#1B1917",
                 color: "#FFFFFF",
@@ -195,7 +205,7 @@ function ChatBubble({ message }) {
         }
       >
         <div className="text-[10px] font-bold uppercase tracking-wide mb-1 opacity-60">
-          {isCliente ? "Cliente" : "Salva"}
+          {isCliente ? "Cliente" : isManual ? "Salva (manual)" : "Salva"}
         </div>
         {message.text}
       </div>
@@ -203,33 +213,94 @@ function ChatBubble({ message }) {
   );
 }
 
-function ConversationDetail({ client, column, archivoBlackClass, onClose }) {
+function ConversationDetail({ client, column, archivoBlackClass, onClose, onTogglePausado, onMessageSent, onShowError }) {
   const { messages, malformed } = parseConversation(client.conversacion);
+  const [pausando, setPausando] = useState(false);
+  const [mensaje, setMensaje] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [client.conversacion]);
 
   let lastTimestamp = null;
 
+  async function handleTogglePausado() {
+    setPausando(true);
+    try {
+      await onTogglePausado(client.id, !client.pausado);
+    } finally {
+      setPausando(false);
+    }
+  }
+
+  async function handleEnviar() {
+    const texto = mensaje.trim();
+    if (!texto || enviando) return;
+    if (!client.telefono) {
+      onShowError("Este cliente no tiene teléfono registrado, no se puede enviar el mensaje.");
+      return;
+    }
+    setEnviando(true);
+    try {
+      const res = await fetch("/api/pausa-manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ telefono: client.telefono, mensaje: texto }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo enviar el mensaje");
+      setMensaje("");
+      onMessageSent(client.id);
+    } catch (err) {
+      onShowError(`No se pudo enviar el mensaje: ${err.message}`);
+    } finally {
+      setEnviando(false);
+    }
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex flex-col" style={{ background: "#F3EEE1" }}>
-      <div className="flex items-start justify-between gap-3 px-5 sm:px-10 py-5 border-b border-[#E5DFCB]">
+    <div
+      className="fixed inset-0 z-50 flex flex-col"
+      style={{ background: "#F3EEE1", borderTop: client.pausado ? "5px solid #B8791A" : "none" }}
+    >
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 px-5 sm:px-10 py-5 border-b border-[#E5DFCB]">
         <div className="min-w-0">
           <div className={`${archivoBlackClass} text-[19px] sm:text-[22px] text-[#1B1917] truncate`}>
             {client.nombre || "Cliente sin nombre"}
           </div>
           <div className="text-[13px] text-[#6B6B68] mt-1">{client.telefono || "Sin teléfono"}</div>
-          <div className="mt-2.5">
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
             <StatusBadge column={column} />
+            {client.pausado ? (
+              <span className="text-[11px] font-bold tracking-wide uppercase px-3 py-1 rounded-full whitespace-nowrap bg-[#B8791A] text-white">
+                Pausado — respondiendo manualmente
+              </span>
+            ) : null}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="cursor-pointer shrink-0 bg-[#1B1917] text-white text-[13px] font-bold uppercase tracking-wide px-4 py-2.5 rounded"
-        >
-          Cerrar
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={handleTogglePausado}
+            disabled={pausando}
+            className="cursor-pointer flex-1 sm:flex-none shrink-0 text-white text-[13px] font-bold uppercase tracking-wide px-4 py-2.5 rounded disabled:opacity-60 disabled:cursor-not-allowed"
+            style={{ background: client.pausado ? "#2E8B3D" : "#B8791A" }}
+          >
+            {pausando ? "Guardando…" : client.pausado ? "Reanudar bot" : "Pausar bot"}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="cursor-pointer flex-1 sm:flex-none shrink-0 bg-[#1B1917] text-white text-[13px] font-bold uppercase tracking-wide px-4 py-2.5 rounded"
+          >
+            Cerrar
+          </button>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 sm:px-10 py-6">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 sm:px-10 py-6">
         {malformed ? (
           <div className="max-w-[720px] mx-auto bg-white border border-[#E5DFCB] rounded-lg p-4 text-[13px] text-[#6B6B68] whitespace-pre-wrap break-words">
             {client.conversacion ? client.conversacion : "Todavía no hay conversación registrada para este cliente."}
@@ -252,6 +323,29 @@ function ConversationDetail({ client, column, archivoBlackClass, onClose }) {
             })}
           </div>
         )}
+      </div>
+
+      <div className="border-t border-[#E5DFCB] bg-[#F3EEE1] px-5 sm:px-10 py-4">
+        <div className="max-w-[720px] mx-auto flex gap-2">
+          <input
+            type="text"
+            value={mensaje}
+            onChange={(e) => setMensaje(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !enviando) handleEnviar();
+            }}
+            placeholder="Escribe un mensaje manual para este cliente…"
+            className="flex-1 min-w-0 rounded-lg border border-[#D8D3C4] bg-white px-3.5 py-2.5 text-[14px] text-[#1B1917] placeholder:text-[#A8A399] focus:outline-none focus:border-[#B8791A]"
+          />
+          <button
+            type="button"
+            onClick={handleEnviar}
+            disabled={enviando || !mensaje.trim()}
+            className="cursor-pointer shrink-0 bg-[#1B1917] text-white text-[13px] font-bold uppercase tracking-wide px-5 py-2.5 rounded disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {enviando ? "Enviando…" : "Enviar"}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -330,6 +424,33 @@ export default function ConversationsBoard({ archivoBlackClass }) {
     }
   }
 
+  async function handleTogglePausado(clientId, nuevoPausado) {
+    suppressPollRef.current = true;
+    const previous = clientes;
+    setClientes((current) => current.map((c) => (c.id === clientId ? { ...c, pausado: nuevoPausado } : c)));
+    try {
+      const res = await fetch(`/api/clientes/${clientId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pausado: nuevoPausado }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al actualizar el estado de pausa");
+    } catch (err) {
+      setClientes(previous);
+      showError(`No se pudo actualizar el estado de pausa: ${err.message}`);
+    } finally {
+      suppressPollRef.current = false;
+    }
+  }
+
+  async function handleMessageSent(clientId) {
+    suppressPollRef.current = true;
+    setClientes((current) => current.map((c) => (c.id === clientId ? { ...c, pausado: true } : c)));
+    suppressPollRef.current = false;
+    await loadClientes();
+  }
+
   if (error && !clientes) {
     return <div className="px-10 pt-7 text-[14px] text-red-700">Error cargando conversaciones: {error}</div>;
   }
@@ -381,6 +502,9 @@ export default function ConversationsBoard({ archivoBlackClass }) {
           column={COLUMN_BY_VALUE[detailClient.estado]}
           archivoBlackClass={archivoBlackClass}
           onClose={() => setDetailClientId(null)}
+          onTogglePausado={handleTogglePausado}
+          onMessageSent={handleMessageSent}
+          onShowError={showError}
         />
       ) : null}
     </div>

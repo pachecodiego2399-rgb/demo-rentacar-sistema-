@@ -17,6 +17,7 @@ export async function GET() {
         r.fields[CLIENTES_FIELDS.TARJETA_CREDITO] ||
         "",
       fechaContacto: r.fields[CLIENTES_FIELDS.FECHA_CONTACTO] || null,
+      pausado: !!r.fields[CLIENTES_FIELDS.PAUSADO],
     }));
     return NextResponse.json({ clientes });
   } catch (err) {

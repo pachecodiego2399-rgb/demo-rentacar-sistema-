@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "rentacar-dashboard",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd \"/Users/diegopacheco/Desktop/Automatizacines IA /rentacar-dashboard\" && npm run dev -- --port 3012"],
+      "port": 3012
     }
   ]
 }
